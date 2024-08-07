@@ -257,7 +257,16 @@ contract Blackjack is Ownable {
     address player,
     uint256 index
   ) public view returns (Game memory) {
-    return _getGame(player, index);
+    Game memory game = _getGame(player, index);
+
+    if (game.status == GameStatus.Playing) {
+      // hide dealer card
+      uint16[] memory newDealerCards = new uint16[](game.dealerCards.length);
+      newDealerCards[0] = game.dealerCards[0];
+      game.dealerCards = newDealerCards;
+    }
+
+    return game;
   }
 
   /**
