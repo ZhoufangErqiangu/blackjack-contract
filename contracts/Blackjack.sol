@@ -261,6 +261,11 @@ contract Blackjack is Ownable {
     return _nextGameIndex[player];
   }
 
+  /**
+   * @dev get game
+   * @param player player address
+   * @param index game index
+   */
   function _getGame(
     address player,
     uint256 index
