@@ -6,11 +6,10 @@ import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
 contract Blackjack is Ownable {
-  IERC20 public _token;
-  uint256 public _bet = 10 ** 18;
+  IERC20 private _token;
+  uint256 private _bet = 10 ** 18;
 
-  uint256 public _cardsCount = 52;
-  uint16[] public _cards = [
+  uint16[] private _cards = [
     // spade
     0x11,
     0x12,
@@ -85,6 +84,7 @@ contract Blackjack is Ownable {
     0x4D
     // NO JOKERS
   ];
+  uint256 private _cardsCount = _cards.length;
 
   event GameStart(
     address indexed player,
@@ -112,11 +112,39 @@ contract Blackjack is Ownable {
   }
 
   /**
+   * @dev get token address
+   */
+  function getToken() public view returns (address) {
+    return address(_token);
+  }
+
+  /**
+   * @dev get bet
+   */
+  function getBet() public view returns (uint256) {
+    return _bet;
+  }
+
+  /**
    * set bet
    * @param bet bet amount
    */
   function setBet(uint256 bet) public onlyOwner {
     _bet = bet;
+  }
+
+  /**
+   * @dev get cards
+   */
+  function getCards() public view returns (uint16[] memory) {
+    return _cards;
+  }
+
+  /**
+   * @dev get cards count
+   */
+  function getCardsCount() public view returns (uint256) {
+    return _cardsCount;
   }
 
   /**
@@ -248,9 +276,9 @@ contract Blackjack is Ownable {
   }
 
   // next game index
-  mapping(address => uint256) public _nextGameIndex;
+  mapping(address => uint256) private _nextGameIndex;
   // games
-  mapping(address => mapping(uint256 => Game)) public _games;
+  mapping(address => mapping(uint256 => Game)) private _games;
 
   /**
    * @dev get next game index
