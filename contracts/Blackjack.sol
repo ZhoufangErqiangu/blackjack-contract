@@ -104,6 +104,7 @@ contract Blackjack is Ownable {
   event GameEnd(
     address indexed player,
     uint256 indexed index,
+    bool isDouble,
     GameStatus status
   );
 
@@ -260,6 +261,7 @@ contract Blackjack is Ownable {
     Init,
     Playing,
     PlayerWin,
+    PlayerBlackjack,
     DealerWin,
     Draw
   }
@@ -455,6 +457,7 @@ contract Blackjack is Ownable {
 
   /**
    * @dev judge game
+   * @param index game index
    * @param game game
    * @param isStand if player stand
    */
@@ -468,7 +471,7 @@ contract Blackjack is Ownable {
     // check player bust
     if (playerPoint > 21) {
       game.status = GameStatus.DealerWin;
-      emit GameEnd(msg.sender, index, GameStatus.DealerWin);
+      emit GameEnd(msg.sender, index, game.isDoubled, GameStatus.DealerWin);
       return GameStatus.DealerWin;
     }
 
@@ -482,6 +485,7 @@ contract Blackjack is Ownable {
       game.dealerCards,
       game.dealerSoft
     );
+    bool playerBlackjack = game.playerCards.length == 2 && playerPoint == 21;
     while (dealerPoint < 17) {
       // add card to dealer
       _dealNextCard(game, false);
@@ -489,40 +493,109 @@ contract Blackjack is Ownable {
     }
     // check dealer bust
     if (dealerPoint > 21) {
-      game.status = GameStatus.PlayerWin;
-
-        // transfer token
-        _token.transfer(msg.sender, _safeMul(game.bet, 2));
-
-      emit GameEnd(msg.sender, index, GameStatus.PlayerWin);
-      return GameStatus.PlayerWin;
+      if (playerBlackjack) {
+        // player blackjack
+        game.status = GameStatus.PlayerBlackjack;
+        _playerWinTransfer(game);
+        emit GameEnd(
+          msg.sender,
+          index,
+          game.isDoubled,
+          GameStatus.PlayerBlackjack
+        );
+        return GameStatus.PlayerBlackjack;
+      } else {
+        // player win
+        game.status = GameStatus.PlayerWin;
+        _playerWinTransfer(game);
+        emit GameEnd(msg.sender, index, game.isDoubled, GameStatus.PlayerWin);
+        return GameStatus.PlayerWin;
+      }
     }
 
     // check winner
+    bool dealerBlackjack = game.dealerCards.length == 2 && dealerPoint == 21;
     if (playerPoint > dealerPoint) {
-      game.status = GameStatus.PlayerWin;
-
-      // check blackjack
-      if (game.playerCards.length == 2 && playerPoint == 21) {
-        // transfer token
-        _token.transfer(msg.sender, Math.mulDiv(game.bet, 3, 2));
+      if (playerBlackjack) {
+        // player blackjack
+        game.status = GameStatus.PlayerBlackjack;
+        _playerWinTransfer(game);
+        emit GameEnd(
+          msg.sender,
+          index,
+          game.isDoubled,
+          GameStatus.PlayerBlackjack
+        );
+        return GameStatus.PlayerBlackjack;
       } else {
-        // transfer token
-        _token.transfer(msg.sender, _safeMul(game.bet, 2));
+        // player win
+        game.status = GameStatus.PlayerWin;
+        _playerWinTransfer(game);
+        emit GameEnd(msg.sender, index, game.isDoubled, GameStatus.PlayerWin);
+        return GameStatus.PlayerWin;
       }
-
-      return GameStatus.PlayerWin;
     } else if (playerPoint < dealerPoint) {
+      // dealer win
       game.status = GameStatus.DealerWin;
+      emit GameEnd(msg.sender, index, game.isDoubled, GameStatus.DealerWin);
       return GameStatus.DealerWin;
     } else {
-      game.status = GameStatus.Draw;
-
-      // transfer token
-      _token.transfer(msg.sender, game.bet);
-
-      return GameStatus.Draw;
+      if (playerBlackjack && !dealerBlackjack) {
+        // player blackjack
+        game.status = GameStatus.PlayerBlackjack;
+        _playerWinTransfer(game);
+        emit GameEnd(
+          msg.sender,
+          index,
+          game.isDoubled,
+          GameStatus.PlayerBlackjack
+        );
+        return GameStatus.PlayerBlackjack;
+      } else {
+        // draw
+        game.status = GameStatus.Draw;
+        _drawTransfer(game);
+        emit GameEnd(msg.sender, index, game.isDoubled, GameStatus.Draw);
+        return GameStatus.Draw;
+      }
     }
+  }
+
+  /**
+   * @dev transfer token to player when player win
+   * @param game game
+   */
+  function _playerWinTransfer(Game storage game) internal {
+    uint256 bet = game.bet;
+
+    // check blackjack
+    if (game.status == GameStatus.PlayerBlackjack) {
+      bet = Math.mulDiv(bet, 3, 2);
+    }
+
+    // check double
+    if (game.isDoubled) {
+      bet = _safeMul(bet, 2);
+    }
+
+    // transfer token
+    _token.transfer(msg.sender, bet);
+  }
+
+  /**
+   * @dev transfer token to player when draw
+   * @param game game
+   */
+  function _drawTransfer(Game storage game) internal {
+    uint256 bet = game.bet;
+
+    // check double
+    if (game.isDoubled) {
+      bet = _safeMul(bet, 2);
+    }
+
+    // transfer token
+    _token.transfer(msg.sender, bet);
   }
 
   /**
