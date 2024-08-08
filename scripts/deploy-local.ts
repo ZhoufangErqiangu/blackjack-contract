@@ -1,9 +1,16 @@
 // @ts-ignore
 import { ethers } from "hardhat";
-import { n2b } from "../utils/math";
 
 async function main() {
-  // deploy below
+  // deploy bet token
+  const bet = await ethers.deployContract("Token", ["Bet", "BET"]);
+  await bet.waitForDeployment();
+  console.log("BET deployed to", bet.target);
+
+  // deploy blackjack
+  const blackjack = await ethers.deployContract("Blackjack", [bet.target]);
+  await blackjack.waitForDeployment();
+  console.log("Blackjack deployed to", blackjack.target);
 }
 
 // We recommend this pattern to be able to use async/await everywhere
