@@ -86,6 +86,27 @@ contract Blackjack is Ownable {
     // NO JOKERS
   ];
 
+  event GameStart(
+    address indexed player,
+    uint256 indexed index,
+    bool dealerSoft,
+    uint16 playerCard1,
+    uint16 playerCard2,
+    uint16 dealerCard1
+  );
+  event GameHit(
+    address indexed player,
+    uint256 indexed index,
+    bool isDouble,
+    uint16 card
+  );
+  event GameStand(address indexed player, uint256 indexed index);
+  event GameEnd(
+    address indexed player,
+    uint256 indexed index,
+    GameStatus status
+  );
+
   constructor(address aceptedToken) Ownable(msg.sender) {
     _token = IERC20(aceptedToken);
   }
@@ -273,8 +294,12 @@ contract Blackjack is Ownable {
    * @dev deal next card
    * @param game game
    * @param toPlayer if card is to player
+   * @return card
    */
-  function _dealNextCard(Game storage game, bool toPlayer) internal {
+  function _dealNextCard(
+    Game storage game,
+    bool toPlayer
+  ) internal returns (uint16) {
     // get next card
     uint16 card = game.cards[game.nextCardIndex];
     if (toPlayer) {
@@ -299,6 +324,8 @@ contract Blackjack is Ownable {
       game.dealerCards = newDealerCards;
     }
     game.nextCardIndex += 1;
+
+    return card;
   }
 
   /**
@@ -339,6 +366,15 @@ contract Blackjack is Ownable {
     });
     _nextGameIndex[msg.sender] = gameIndex + 1;
 
+    emit GameStart(
+      msg.sender,
+      gameIndex,
+      dealerSoft,
+      playerCards[0],
+      playerCards[1],
+      dealerCards[0]
+    );
+
     return gameIndex;
   }
 
@@ -364,9 +400,10 @@ contract Blackjack is Ownable {
     }
 
     // add card to player
-    _dealNextCard(game, true);
+    uint16 card = _dealNextCard(game, true);
+    emit GameHit(msg.sender, index, isDouble, card);
 
-    _judgeGame(game, false);
+    _judgeGame(game, index, false);
   }
 
   /**
@@ -378,7 +415,9 @@ contract Blackjack is Ownable {
     Game storage game = _getGame(msg.sender, index);
     require(game.status == GameStatus.Playing, "Game is not playing");
 
-    _judgeGame(game, true);
+    emit GameStand(msg.sender, index);
+
+    _judgeGame(game, index, true);
   }
 
   /**
@@ -388,6 +427,7 @@ contract Blackjack is Ownable {
    */
   function _judgeGame(
     Game storage game,
+    uint256 index,
     bool isStand
   ) internal returns (GameStatus) {
     // get player point
@@ -395,6 +435,7 @@ contract Blackjack is Ownable {
     // check player bust
     if (playerPoint > 21) {
       game.status = GameStatus.DealerWin;
+      emit GameEnd(msg.sender, index, GameStatus.DealerWin);
       return GameStatus.DealerWin;
     }
 
@@ -417,9 +458,10 @@ contract Blackjack is Ownable {
     if (dealerPoint > 21) {
       game.status = GameStatus.PlayerWin;
 
-      // transfer token
-      _token.transfer(msg.sender, _safeMul(game.bet, 2));
+        // transfer token
+        _token.transfer(msg.sender, _safeMul(game.bet, 2));
 
+      emit GameEnd(msg.sender, index, GameStatus.PlayerWin);
       return GameStatus.PlayerWin;
     }
 
