@@ -320,6 +320,8 @@ contract Blackjack is Ownable {
       uint16[] memory newDealerCards = new uint16[](game.dealerCards.length);
       newDealerCards[0] = game.dealerCards[0];
       game.dealerCards = newDealerCards;
+      // hide game cards
+      game.cards = new uint16[](0);
     }
 
     return game;
