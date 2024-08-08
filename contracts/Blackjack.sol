@@ -326,6 +326,24 @@ contract Blackjack is Ownable {
   }
 
   /**
+   * @dev deal next card inner
+   * @param originCards origin cards
+   * @param card card to add
+   * @return new cards
+   */
+  function _dealNextCardInner(
+    uint16[] memory originCards,
+    uint16 card
+  ) public pure returns (uint16[] memory) {
+    uint16[] memory newCards = new uint16[](originCards.length + 1);
+    for (uint256 i = 0; i < originCards.length; i++) {
+      newCards[i] = originCards[i];
+    }
+    newCards[originCards.length] = card;
+    return newCards;
+  }
+
+  /**
    * @dev deal next card
    * @param game game
    * @param toPlayer if card is to player
@@ -339,24 +357,10 @@ contract Blackjack is Ownable {
     uint16 card = game.cards[game.nextCardIndex];
     if (toPlayer) {
       // add card to player
-      uint16[] memory playerCards = game.playerCards;
-      uint16[] memory newPlayerCards = new uint16[](playerCards.length + 1);
-      for (uint256 i = 0; i < playerCards.length; i++) {
-        newPlayerCards[i] = playerCards[i];
-      }
-      newPlayerCards[playerCards.length] = card;
-      // update game
-      game.playerCards = newPlayerCards;
+      game.playerCards = _dealNextCardInner(game.playerCards, card);
     } else {
       // add card to dealer
-      uint16[] memory dealerCards = game.dealerCards;
-      uint16[] memory newDealerCards = new uint16[](dealerCards.length + 1);
-      for (uint256 i = 0; i < dealerCards.length; i++) {
-        newDealerCards[i] = dealerCards[i];
-      }
-      newDealerCards[dealerCards.length] = card;
-      // update game
-      game.dealerCards = newDealerCards;
+      game.dealerCards = _dealNextCardInner(game.dealerCards, card);
     }
     game.nextCardIndex += 1;
 
