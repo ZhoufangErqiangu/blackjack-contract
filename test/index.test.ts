@@ -9,6 +9,50 @@ import { b2n, n2b } from "../utils/math";
 // @ts-ignore
 import { ethers } from "hardhat";
 
+const CARDS = [
+  // spade
+  0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19,
+  // spade 10
+  0x1a,
+  // spade J
+  0x1b,
+  // spade Q
+  0x1c,
+  // spade K
+  0x1d,
+  // heart
+  0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29,
+  // heart 10
+  0x2a,
+  // heart J
+  0x2b,
+  // heart Q
+  0x2c,
+  // heart K
+  0x2d,
+  // diamond
+  0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39,
+  // diamond 10
+  0x3a,
+  // diamond J
+  0x3b,
+  // diamond Q
+  0x3c,
+  // diamond K
+  0x3d,
+  // club
+  0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49,
+  // club 10
+  0x4a,
+  // club J
+  0x4b,
+  // club Q
+  0x4c,
+  // club K
+  0x4d,
+  // NO JOKERS
+];
+
 async function depoly() {
   const [owner, other] = await ethers.getSigners();
   // token
@@ -44,7 +88,7 @@ describe("deploy test", () => {
   test("should be right token", async () => {
     const { bet, blackjack } = await loadFixture(depoly);
     strictEqual(
-      await blackjack._token(),
+      await blackjack.getToken(),
       await bet.getAddress(),
       "blackjack token not match",
     );
@@ -57,7 +101,7 @@ describe("deploy test", () => {
     await blackjack.setBet(betAmount);
 
     strictEqual(
-      await blackjack._bet(),
+      await blackjack.getBet(),
       betAmount,
       "blackjack bet amount not match",
     );
@@ -65,10 +109,22 @@ describe("deploy test", () => {
     const betAmount2 = n2b(2, 18);
     await blackjack.setBet(betAmount2);
     strictEqual(
-      await blackjack._bet(),
+      await blackjack.getBet(),
       betAmount2,
       "blackjack bet amount not match",
     );
+  });
+  test("should be right cards", async () => {
+    const { blackjack } = await loadFixture(depoly);
+    const cards = await blackjack.getCards();
+    strictEqual(cards.length, 52, "cards length not match");
+    strictEqual(cards.length, CARDS.length, "cards length not match");
+    for (let i = 0; i < cards.length; i++) {
+      strictEqual(b2n(cards[i], 0), CARDS[i], "cards not match");
+    }
+    const cardsCount = await blackjack.getCardsCount();
+    strictEqual(b2n(cardsCount, 0), 52, "cards count not match");
+    strictEqual(b2n(cardsCount, 0), CARDS.length, "cards length not match");
   });
 });
 
@@ -153,7 +209,7 @@ describe("play game test", () => {
   test("should be able to start a game", async () => {
     const { other, blackjack, bet } = await loadFixture(depoly);
     const gameIndex = await blackjack.getNextGameIndex(other.address);
-    const betAmount = await blackjack._bet();
+    const betAmount = await blackjack.getBet();
     await bet.connect(other).approve(await blackjack.getAddress(), betAmount);
     await blackjack.connect(other).start(false);
     const gameIndexNext = await blackjack.getNextGameIndex(other.address);
@@ -170,7 +226,7 @@ describe("play game test", () => {
   test("should be able to hit", async () => {
     const { other, blackjack, bet } = await loadFixture(depoly);
     const gameIndex = await blackjack.getNextGameIndex(other.address);
-    const betAmount = await blackjack._bet();
+    const betAmount = await blackjack.getBet();
     await bet.connect(other).approve(await blackjack.getAddress(), betAmount);
     await blackjack.connect(other).start(false);
     await blackjack.connect(other).hit(gameIndex, false);
@@ -178,7 +234,7 @@ describe("play game test", () => {
   test("should be able to hit double", async () => {
     const { other, blackjack, bet } = await loadFixture(depoly);
     const gameIndex = await blackjack.getNextGameIndex(other.address);
-    const betAmount = await blackjack._bet();
+    const betAmount = await blackjack.getBet();
     await bet.connect(other).approve(await blackjack.getAddress(), betAmount);
     await blackjack.connect(other).start(false);
     await bet.connect(other).approve(await blackjack.getAddress(), betAmount);
@@ -186,7 +242,7 @@ describe("play game test", () => {
   });
   test("should be able to stop a game by stand", async () => {
     const { other, blackjack, bet } = await loadFixture(depoly);
-    const betAmount = await blackjack._bet();
+    const betAmount = await blackjack.getBet();
     await bet.connect(other).approve(await blackjack.getAddress(), betAmount);
     const gameIndex = await blackjack.getNextGameIndex(other.address);
     await blackjack.connect(other).start(false);
