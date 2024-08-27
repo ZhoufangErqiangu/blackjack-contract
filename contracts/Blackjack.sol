@@ -233,28 +233,26 @@ contract Blackjack is Ownable {
   }
 
   /**
-   * @dev draw cards
-   * @return cards
+   * @dev deal card
+   * @param cards cards
+   * @param nextCardIndex next card index
+   * @return newCards new cards
+   * @return card card
    */
-  function dealCards() public view returns (uint16[] memory) {
-    // generate cards
-    uint16[] memory cards = new uint16[](_cardsCount);
-    for (uint256 i = 0; i < _cardsCount; i++) {
-      cards[i] = _cards[i];
-    }
+  function dealCard(
+    uint16[] memory cards,
+    uint256 nextCardIndex
+  ) public view returns (uint16[] memory newCards, uint16 card) {
+    uint256 remainCardsCount = cards.length - nextCardIndex;
+    uint256 cardIndex = uint256(keccak256(abi.encodePacked(block.timestamp))) %
+      remainCardsCount;
 
-    // shuffle cards
-    for (uint256 i = 0; i < _cardsCount; i++) {
-      // could use pyth random here
-      uint256 j = i +
-        (uint256(keccak256(abi.encodePacked(block.timestamp))) %
-          (_cardsCount - i));
-      uint16 temp = cards[i];
-      cards[i] = cards[j];
-      cards[j] = temp;
-    }
+    // swap cards
+    uint16 newCard = cards[nextCardIndex + cardIndex];
+    cards[nextCardIndex + cardIndex] = cards[nextCardIndex];
+    cards[nextCardIndex] = newCard;
 
-    return cards;
+    return (cards, newCard);
   }
 
   enum GameStatus {
@@ -313,36 +311,7 @@ contract Blackjack is Ownable {
     address player,
     uint256 index
   ) public view returns (Game memory) {
-    Game memory game = _getGame(player, index);
-
-    if (game.status == GameStatus.Playing) {
-      // hide dealer card
-      uint16[] memory newDealerCards = new uint16[](game.dealerCards.length);
-      newDealerCards[0] = game.dealerCards[0];
-      game.dealerCards = newDealerCards;
-      // hide game cards
-      game.cards = new uint16[](0);
-    }
-
-    return game;
-  }
-
-  /**
-   * @dev deal next card inner
-   * @param originCards origin cards
-   * @param card card to add
-   * @return new cards
-   */
-  function _dealNextCardInner(
-    uint16[] memory originCards,
-    uint16 card
-  ) public pure returns (uint16[] memory) {
-    uint16[] memory newCards = new uint16[](originCards.length + 1);
-    for (uint256 i = 0; i < originCards.length; i++) {
-      newCards[i] = originCards[i];
-    }
-    newCards[originCards.length] = card;
-    return newCards;
+    return _getGame(player, index);
   }
 
   /**
@@ -354,15 +323,15 @@ contract Blackjack is Ownable {
   function _dealNextCard(
     Game storage game,
     bool toPlayer
-  ) internal returns (uint16) {
+  ) internal returns (uint16 card) {
     // get next card
-    uint16 card = game.cards[game.nextCardIndex];
+    (game.cards, card) = dealCard(game.cards, game.nextCardIndex);
+
+    // add card to player or dealer
     if (toPlayer) {
-      // add card to player
-      game.playerCards = _dealNextCardInner(game.playerCards, card);
+      game.playerCards.push(card);
     } else {
-      // add card to dealer
-      game.dealerCards = _dealNextCardInner(game.dealerCards, card);
+      game.dealerCards.push(card);
     }
     game.nextCardIndex += 1;
 
@@ -381,39 +350,38 @@ contract Blackjack is Ownable {
     // transfer token
     _token.transferFrom(msg.sender, address(this), _bet);
 
-    // generate cards
-    uint16[] memory cards = dealCards();
+    // copy all cards
+    uint16[] memory cards = new uint16[](_cardsCount);
+    for (uint256 i = 0; i < _cardsCount; i++) {
+      cards[i] = _cards[i];
+    }
 
-    // deal cards
-    uint16[] memory playerCards = new uint16[](2);
-    uint16[] memory dealerCards = new uint16[](2);
-
-    playerCards[0] = cards[0];
-    playerCards[1] = cards[1];
-    dealerCards[0] = cards[2];
-    dealerCards[1] = cards[3];
-
-    // set game
+    // create game
     uint256 gameIndex = _nextGameIndex[msg.sender];
     _games[msg.sender][gameIndex] = Game({
       bet: _bet,
       dealerSoft: dealerSoft,
       isDoubled: false,
       cards: cards,
-      playerCards: playerCards,
-      dealerCards: dealerCards,
-      nextCardIndex: 4,
+      playerCards: new uint16[](0),
+      dealerCards: new uint16[](0),
+      nextCardIndex: 3,
       status: GameStatus.Playing
     });
+    _dealNextCard(_games[msg.sender][gameIndex], true);
+    _dealNextCard(_games[msg.sender][gameIndex], true);
+    _dealNextCard(_games[msg.sender][gameIndex], false);
+
+    // update data
     _nextGameIndex[msg.sender] = gameIndex + 1;
 
     emit GameStart(
       msg.sender,
       gameIndex,
       dealerSoft,
-      playerCards[0],
-      playerCards[1],
-      dealerCards[0]
+      _games[msg.sender][gameIndex].playerCards[0],
+      _games[msg.sender][gameIndex].playerCards[1],
+      _games[msg.sender][gameIndex].dealerCards[0]
     );
 
     return gameIndex;
@@ -611,7 +579,7 @@ contract Blackjack is Ownable {
    */
   function _safeAdd(uint256 a, uint256 b) internal pure returns (uint256) {
     (bool isMathSafe, uint256 c) = Math.tryAdd(a, b);
-    require(isMathSafe, "Sap: math error");
+    require(isMathSafe, "Blackjack: math error");
     return c;
   }
 
@@ -622,7 +590,7 @@ contract Blackjack is Ownable {
    */
   function _safeSub(uint256 a, uint256 b) internal pure returns (uint256) {
     (bool isMathSafe, uint256 c) = Math.trySub(a, b);
-    require(isMathSafe, "Sap: math error");
+    require(isMathSafe, "Blackjack: math error");
     return c;
   }
 
@@ -633,7 +601,7 @@ contract Blackjack is Ownable {
    */
   function _safeMul(uint256 a, uint256 b) internal pure returns (uint256) {
     (bool isMathSafe, uint256 c) = Math.tryMul(a, b);
-    require(isMathSafe, "Sap: math error");
+    require(isMathSafe, "Blackjack: math error");
     return c;
   }
 
@@ -644,7 +612,7 @@ contract Blackjack is Ownable {
    */
   function _safeDiv(uint256 a, uint256 b) internal pure returns (uint256) {
     (bool isMathSafe, uint256 c) = Math.tryDiv(a, b);
-    require(isMathSafe, "Sap: math error");
+    require(isMathSafe, "Blackjack: math error");
     return c;
   }
 }

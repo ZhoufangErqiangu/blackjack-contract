@@ -221,7 +221,7 @@ describe("play game test", () => {
     const game = await blackjack.getGame(other.address, gameIndex);
     strictEqual(b2n(game.status, 0), 1, "game status should be 1");
     strictEqual(game.playerCards.length, 2, "player cards length should be 2");
-    strictEqual(game.dealerCards.length, 2, "dealer cards length should be 2");
+    strictEqual(game.dealerCards.length, 1, "dealer cards length should be 1");
   });
   test("should be able to hit", async () => {
     const { other, blackjack, bet } = await loadFixture(depoly);
